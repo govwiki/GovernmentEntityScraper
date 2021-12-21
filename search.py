@@ -58,6 +58,7 @@ def getBingSearchResults(query):
 def getGoogleSearchResults(query):
     # desktop user-agent
     USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0"
+    # USER_AGENT = "my bot"
 
     query = query.replace(' ', '+')
     URL = f"https://google.com/search?q={query}"
@@ -70,6 +71,7 @@ def getGoogleSearchResults(query):
         results = []
         for g in soup.find_all('div', 'tF2Cxc'):
             anchors = g.find_all('a')
+            # print(anchors)
             for anchor in anchors:
                 if 'href' in anchor.attrs:
                     href = anchor['href']
@@ -78,20 +80,38 @@ def getGoogleSearchResults(query):
                         # print(str(href))
         return results
     else:
-        print("invalid code")
+        print("bad request: " + str(resp.headers))
         return []
 
 
 def getMatchingLink(query):
+    print("   ")
     links = getGoogleSearchResults(query)
     matchingLink = ""
+    print(" --- " + str(query) + " ---")
+    # for link in links:
+    #     print(link)
+    # print("   ")
+
     for link in links:
-        if 'wikipedia' not in link and 'facebook' not in link:
+        slashes = num_slashes(link)
+        if slashes <= 3 and 'wikipedia' not in link and 'facebook' not in link:
             status = url_checker.getStatusCode(link)
+            print(link + " --- " + str(status))
             if status == 200:
                 matchingLink = link
                 break
+        else:
+            print(link + "--- invalid")
     return matchingLink
+
+
+def num_slashes(link):
+    count = 0
+    for letter in link[:-1]:
+        if letter == '/':
+            count += 1
+    return count
 
 
 def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
@@ -157,6 +177,6 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 
 
 iterate('Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='texas_websites_1.xlsx', fn=getMatchingLink,
+        'D', output_file='texas_websites_2.xlsx', fn=getMatchingLink,
         suffix="Texas",
-        debug=True, parallel=False, startRow=500)
+        debug=True, parallel=False, startRow=1599)
