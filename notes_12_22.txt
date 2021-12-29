@@ -1,0 +1,33 @@
+
+notes
+
+1. experiment with google advanced search
+
+2. I think the 2 or 3 slashes is a good idea in general because even if a webpage within another website exists, it is unlikely to have the financial documents if it is part of another website
+
+
+-- add a flag if the name of the county is not in the url (use for cities, towns, counties)
+
+--- exclude books.google.com 
+
+--- use other spreadsheet to lookup "address" of entity name, and see if it exists in retrieved search result
+
+--- row 1485,... -- should return subpage
+
+
+--- look at more special districts
+
+
+Redis university database
+
+joins
+
+udemy for free
+
+
+-------------------------------------------
+12/23 Notes
+
+75% of rows filled in, with 95% accuracy
+
+Write a memo in the form of the email if I cannot obtain 95% accuracy

@@ -88,22 +88,72 @@ def getMatchingLink(query):
     print("   ")
     links = getGoogleSearchResults(query)
     matchingLink = ""
-    print(" --- " + str(query) + " ---")
+    # logger.info(" --- " + str(query) + " ---")
     # for link in links:
     #     print(link)
     # print("   ")
 
     for link in links:
-        slashes = num_slashes(link)
-        if slashes <= 3 and 'wikipedia' not in link and 'facebook' not in link:
+        if is_valid_link1(link, query):
             status = url_checker.getStatusCode(link)
-            print(link + " --- " + str(status))
-            if status == 200:
+            logger.info(link + " --- " + str(status))
+            if is_valid_status(status):
                 matchingLink = link
                 break
         else:
-            print(link + "--- invalid")
+            logger.info(link + "--- invalid")
+    if matchingLink == '':
+        print("--------")
+        for link in links:
+            if is_valid_link2(link):
+                status = url_checker.getStatusCode(link)
+                logger.info("2nd pass: " + link + " --- " + str(status))
+                if is_valid_status(status):
+                    matchingLink = link
+                    break
     return matchingLink
+
+
+def is_valid_status(status):
+    return status == 200 or status == 403 or status == 406
+
+
+invalid_urls = ['wikipedia', 'facebook', 'books.google', 'city-data']
+
+valid_suffixes = ['home', 'index', 'main']
+
+valid_entities = ['county', 'town', 'city']
+
+
+def is_valid_link1(link, query):
+    slashes = num_slashes(link)
+    words = query.split(" ")
+    if len(words) >= 3:
+        entityType = words[0].lower()
+        if entityType in valid_entities:
+            entityName = words[2].lower()
+            if entityName not in link.lower():
+                return False
+
+    if slashes >= 4:
+        return False
+    if slashes == 3:
+        suffix = getPage(link)
+        for valid_suffix in valid_suffixes:
+            if valid_suffix in suffix:
+                return True
+        return False
+    for invalid_url in invalid_urls:
+        if invalid_url in link:
+            return False
+    return True
+
+
+def is_valid_link2(link):
+    slashes = num_slashes(link)
+    if '.gov' in link:
+        return True
+    return False
 
 
 def num_slashes(link):
@@ -114,10 +164,20 @@ def num_slashes(link):
     return count
 
 
+def getPage(link):
+    count = 0
+    for i, letter in enumerate(link[:-1]):
+        if letter == '/':
+            count += 1
+        elif count >= 3:
+            return link[i:]
+    return ''
+
+
 def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             suffix="",
             header_exists=True, debug=False,
-            startRow=1, parallel=True):
+            startRow=1, parallel=True, match_correct=False):
     xlsx_file = Path(excel_filename)
     wb_obj = openpyxl.load_workbook(xlsx_file)
     wsheet = wb_obj[tab_name]
@@ -148,22 +208,71 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             print("%d  (%.1f)" % (rowNumber, elapsed))
             rowNumber += increment
     else:
-        for row in wsheet.iter_rows(max_row=wsheet.max_row):
-            rowNumber += 1
-            if rowNumber < startRow:
-                continue
-            nameCell = column + str(rowNumber)
-            entityName = wsheet[nameCell].value + " " + suffix
+        if match_correct:
+            count = 0
+            num_correct = 0
+            num_filled = 0
+            saved = False
+            for row in wsheet.iter_rows(max_row=wsheet.max_row):
+                rowNumber += 1
+                if rowNumber < startRow:
+                    continue
 
-            res = fn(entityName)
-            book['Sheet1']['A' + str(rowNumber)].value = entityName
-            book['Sheet1']['B' + str(rowNumber)].value = res
-            if rowNumber % 10 == 0:
-                elapsed = time.time() - start
-                print("%d (%.1f)" % (rowNumber, elapsed))
-                book.save(output_file)
+                nameCell = column + str(rowNumber)
+                # print(rowNumber)
+                if wsheet[nameCell].value is None:
+                    continue
+                entityName = wsheet[nameCell].value + " " + suffix
 
-    book.save(output_file)
+                correct_url = book['Sheet1']['C' + str(rowNumber)].value
+                if correct_url is not None:
+                    logger.info(entityName + ": \"" + str(correct_url) + "\"")
+                    res = fn(entityName)
+                    book['Sheet1']['A' + str(rowNumber)].value = entityName
+                    book['Sheet1']['B' + str(rowNumber)].value = res
+                    if res == correct_url or (res == '' and correct_url == 'None'):
+                        book['Sheet1']['D' + str(rowNumber)].value = 'Yes'
+                        num_correct += 1
+                        num_filled += 1
+                    elif (res == '' and correct_url != 'None'):
+                        book['Sheet1']['D' + str(rowNumber)].value = 'Blank'
+                    else:
+                        book['Sheet1']['D' + str(rowNumber)].value = 'No'
+                        num_filled += 1
+                    count += 1
+                    saved = False
+                if count % 10 == 0 and not saved:
+                    elapsed = time.time() - start
+                    # logger.info("%d (%.2f)" %
+                    #             (rowNumber, num_correct / (num_filled + 0.01)))
+                    logger.info("%d correct: %d, filled: %d, total: %d",
+                                rowNumber, num_correct, num_filled, count)
+                    logger.info("accuracy: %.3f " %
+                                (num_correct / (num_filled + 0.01)))
+                    book.save(output_file)
+                    saved = True
+
+            logger.info("%d correct: %d, filled: %d, total: %d",
+                        rowNumber, num_correct, num_filled, count)
+            book.save(output_file)
+
+        else:
+            for row in wsheet.iter_rows(max_row=wsheet.max_row):
+                rowNumber += 1
+                if rowNumber < startRow:
+                    continue
+                nameCell = column + str(rowNumber)
+                entityName = wsheet[nameCell].value + " " + suffix
+
+                res = fn(entityName)
+                book['Sheet1']['A' + str(rowNumber)].value = entityName
+                book['Sheet1']['B' + str(rowNumber)].value = res
+                if rowNumber % 10 == 0:
+                    elapsed = time.time() - start
+                    print("%d (%.1f)" % (rowNumber, elapsed))
+                    book.save(output_file)
+
+        book.save(output_file)
 
 
 def getEntities(start_row, wsheet, increment, column, suffix):
@@ -177,6 +286,6 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 
 
 iterate('Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='texas_websites_2.xlsx', fn=getMatchingLink,
+        'D', output_file='texas_websites_12_27.xlsx', fn=getMatchingLink,
         suffix="Texas",
-        debug=True, parallel=False, startRow=1599)
+        debug=True, parallel=False, match_correct=True, startRow=1)
