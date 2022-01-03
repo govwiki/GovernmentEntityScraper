@@ -71,13 +71,18 @@ def getGoogleSearchResults(query):
         results = []
         for g in soup.find_all('div', 'tF2Cxc'):
             anchors = g.find_all('a')
-            # print(anchors)
+            missingDivs = g.find_all('div', 'TXwUJf')
             for anchor in anchors:
                 if 'href' in anchor.attrs:
                     href = anchor['href']
                     if '/search' not in href and 'http' in href:
-                        results.append(href)
+                        if len(missingDivs) == 0:
+                            results.append(href)
+                        else:
+                            logger.info("missing div: " + str(href))
+                            # results.append(href)
                         # print(str(href))
+
         return results
     else:
         print("bad request: " + str(resp.headers))
@@ -92,8 +97,8 @@ def getMatchingLink(query):
     # for link in links:
     #     print(link)
     # print("   ")
-
-    for link in links:
+    topResults = 6
+    for link in links[:topResults]:
         if is_valid_link1(link, query):
             status = url_checker.getStatusCode(link)
             logger.info(link + " --- " + str(status))
@@ -104,21 +109,23 @@ def getMatchingLink(query):
             logger.info(link + "--- invalid")
     if matchingLink == '':
         print("--------")
-        for link in links:
+        for link in links[:topResults]:
             if is_valid_link2(link):
                 status = url_checker.getStatusCode(link)
                 logger.info("2nd pass: " + link + " --- " + str(status))
                 if is_valid_status(status):
                     matchingLink = link
                     break
+    logger.info("   ")
     return matchingLink
 
 
 def is_valid_status(status):
-    return status == 200 or status == 403 or status == 406
+    return status == 200 or status == 406
 
 
-invalid_urls = ['wikipedia', 'facebook', 'books.google', 'city-data']
+invalid_urls = ['wikipedia', 'facebook',
+                'books.google', 'city-data', 'mapquest', 'manta', 'yellowpages']
 
 valid_suffixes = ['home', 'index', 'main']
 
@@ -149,11 +156,18 @@ def is_valid_link1(link, query):
     return True
 
 
+valid_2_urls = ['tsswcb.texas.gov']
+
+
 def is_valid_link2(link):
     slashes = num_slashes(link)
-    if '.gov' in link:
-        return True
+    for valid_url in valid_2_urls:
+        if valid_url in link:
+            return True
     return False
+    # if '.gov' in link:
+    #     return True
+    # return False
 
 
 def num_slashes(link):
@@ -269,7 +283,7 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
                 book['Sheet1']['B' + str(rowNumber)].value = res
                 if rowNumber % 10 == 0:
                     elapsed = time.time() - start
-                    print("%d (%.1f)" % (rowNumber, elapsed))
+                    logger.info("%d (%.1f)" % (rowNumber, elapsed))
                     book.save(output_file)
 
         book.save(output_file)
@@ -288,4 +302,4 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 iterate('Texas Local Governments.xlsx', 'Census of Govts',
         'D', output_file='texas_websites_12_27.xlsx', fn=getMatchingLink,
         suffix="Texas",
-        debug=True, parallel=False, match_correct=True, startRow=1)
+        debug=True, parallel=False, match_correct=False, startRow=980)
