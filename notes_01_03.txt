@@ -1,0 +1,52 @@
+1 1 2 5 6 7 10
+
+1 2 5
+
+
+Special districts
+
+~ "missing" criteria apply to special districts that are not school districts
+
+School districts should usually have websites
+Not always the case for non-school special districts
+
+
+Way to determine if a name is common enough...
+
+
+Special districts:
+
+
+categorize special districts --
+-> mega-categories based off of Govt_Units_2017
+
+show project to my dad
+
+
+
+Tax Credit Survey Number (Apex)
+07188840378
+
+
+---------------------------------
+
+1/5/2023
+
+For school districts, often the first search result is the correct one
+
+Rules: Contains "SCH DIST", remove missing criterion
+
+
+
+Questions:
+
+For the housing authority, if there is no dedicated website, should I use the listing on one of the housing websites? No
+I am doing that for SWCD (Soil and Water Conservation districts)
+
+WOOD COUNTY CENTRAL HOSPITAL DISTRICT Texas --- there was a website listed off of buzzfile that shows up in the 2nd page of the search results
+
+------------------------------------------
+
+run on all the entities and send it to Marc
+
+

@@ -60,6 +60,10 @@ def getGoogleSearchResults(query):
     USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0"
     # USER_AGENT = "my bot"
 
+    
+    no_missing = "SCH DIST" in query
+    # no_missing = False
+
     query = query.replace(' ', '+')
     URL = f"https://google.com/search?q={query}"
 
@@ -69,14 +73,20 @@ def getGoogleSearchResults(query):
     if resp.status_code == 200:
         soup = BeautifulSoup(resp.content, "html.parser")
         results = []
+        
+        topResults = 6
+        count = 0
         for g in soup.find_all('div', 'tF2Cxc'):
             anchors = g.find_all('a')
             missingDivs = g.find_all('div', 'TXwUJf')
+            count += 1
+            if count > topResults:
+                break
             for anchor in anchors:
                 if 'href' in anchor.attrs:
                     href = anchor['href']
                     if '/search' not in href and 'http' in href:
-                        if len(missingDivs) == 0:
+                        if len(missingDivs) == 0 or no_missing:
                             results.append(href)
                         else:
                             logger.info("missing div: " + str(href))
@@ -97,8 +107,7 @@ def getMatchingLink(query):
     # for link in links:
     #     print(link)
     # print("   ")
-    topResults = 6
-    for link in links[:topResults]:
+    for link in links:
         if is_valid_link1(link, query):
             status = url_checker.getStatusCode(link)
             logger.info(link + " --- " + str(status))
@@ -109,7 +118,7 @@ def getMatchingLink(query):
             logger.info(link + "--- invalid")
     if matchingLink == '':
         print("--------")
-        for link in links[:topResults]:
+        for link in links:
             if is_valid_link2(link):
                 status = url_checker.getStatusCode(link)
                 logger.info("2nd pass: " + link + " --- " + str(status))
@@ -121,13 +130,13 @@ def getMatchingLink(query):
 
 
 def is_valid_status(status):
-    return status == 200 or status == 406
+    return status == 200 or status == 406 or status == 403
 
 
 invalid_urls = ['wikipedia', 'facebook',
                 'books.google', 'city-data', 'mapquest', 'manta', 'yellowpages']
 
-valid_suffixes = ['home', 'index', 'main']
+valid_suffixes = ['home', 'index', 'main', 'en.html']
 
 valid_entities = ['county', 'town', 'city']
 
@@ -191,7 +200,7 @@ def getPage(link):
 def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             suffix="",
             header_exists=True, debug=False,
-            startRow=1, parallel=True, match_correct=False):
+            startRow=1, parallel=True, match_correct=False, endRow=1):
     xlsx_file = Path(excel_filename)
     wb_obj = openpyxl.load_workbook(xlsx_file)
     wsheet = wb_obj[tab_name]
@@ -207,7 +216,7 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
         while rowNumber < startRow:
             rowNumber += 1
 
-        while rowNumber < wsheet.max_row:
+        while rowNumber < wsheet.max_row and rowNumber < endRow:
             entities = getEntities(
                 rowNumber, wsheet, increment, column, suffix)
             with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -300,6 +309,6 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 
 
 iterate('Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='texas_websites_12_27.xlsx', fn=getMatchingLink,
+        'D', output_file='texas_websites_01_05_22_MJ.xlsx', fn=getMatchingLink,
         suffix="Texas",
-        debug=True, parallel=False, match_correct=False, startRow=980)
+        debug=True, parallel=False, match_correct=False, startRow=1, endRow=500)
