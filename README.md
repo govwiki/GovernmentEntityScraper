@@ -14,3 +14,4 @@ If there is a government entity that returns an incorrect url under the current 
 ### Results
 
 `texas_websites_01_10_22.xlsx` : Contains the urls for 5,000+ entities as of January 10th.
+`texas_websites_01_05_22_MJ.xlsx` : Chris produced a spreadsheet containing the urls for the 5,000+ entities as of January 5, 2022. Marc went through 100+ of the entities and provided feedback/comments on incorrect urls.
