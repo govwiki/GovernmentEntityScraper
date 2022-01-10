@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import url_checker
+import valid_urls
+import overriden_entities
 import logging
 import datetime
 import sys
@@ -27,42 +29,33 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 
+abbrev = {}
+abbrev['st'] = 'saint'
+abbrev['ind'] = 'independent'
+abbrev['sch'] = 'school'
+abbrev['dist'] = 'district'
+abbrev['mt'] = 'mount'
 
-def getBingSearchResults(query):
-    # desktop user-agent
-    USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0"
-
-    query = query.replace(' ', '+')
-    URL = f"https://bing.com/search?q={query}"
-
-    headers = {"user-agent": USER_AGENT}
-    resp = requests.get(URL, headers=headers)
-
-    if resp.status_code == 200:
-        soup = BeautifulSoup(resp.content, "html.parser")
-        results = []
-        for g in soup.find_all('ol', id='b_results'):
-            anchors = g.find_all('a')
-            for anchor in anchors:
-                if 'href' in anchor.attrs:
-                    href = anchor['href']
-                    if '/search' not in href and 'http' in href:
-                        results.append(href)
-                        # print(str(href))
-        return results
-    else:
-        print("invalid code")
-        return []
-
+invalid_urls = ['wikipedia', 'facebook',
+                'books.google', 'city-data', 'mapquest', 'manta', 'yellowpages']
+valid_suffixes = ['home', 'index', 'main', 'en.html', 'default', 'about']
+valid_entities = ['county', 'town', 'city']
+isd_words = ['isd', 'independent', 'school']
+valid_2_urls = valid_urls.get_valid_urls()
+overriden_entity_map = overriden_entities.get_overriden_entities()
 
 def getGoogleSearchResults(query):
     # desktop user-agent
     USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:65.0) Gecko/20100101 Firefox/65.0"
-    # USER_AGENT = "my bot"
 
-    
-    no_missing = "SCH DIST" in query
-    # no_missing = False
+    query = query.lower()
+    query_words = query.split(" ")
+    temp = []
+    for word in query_words:
+        temp.append(expand_abbreviation(word))
+    query_words = temp
+
+    is_school_district = is_isd(query_words)
 
     query = query.replace(' ', '+')
     URL = f"https://google.com/search?q={query}"
@@ -85,76 +78,173 @@ def getGoogleSearchResults(query):
             for anchor in anchors:
                 if 'href' in anchor.attrs:
                     href = anchor['href']
+                    title = get_h3_title(anchor.contents)
+                    # if title != '':
+                    #     logger.info("Title: " + str(title))
                     if '/search' not in href and 'http' in href:
-                        if len(missingDivs) == 0 or no_missing:
-                            results.append(href)
+                        if len(missingDivs) == 0 or is_school_district:
+                            result = LinkResult(title, href)
+                            results.append(result)
                         else:
                             logger.info("missing div: " + str(href))
-                            # results.append(href)
-                        # print(str(href))
 
         return results
     else:
         print("bad request: " + str(resp.headers))
         return []
 
+class LinkResult:
+    def __init__(self, title, href):
+        self.title = title
+        self.link = href
+    
+    def __str__(self):
+        return self.title + " : " + self.link
 
-def getMatchingLink(query):
-    print("   ")
-    links = getGoogleSearchResults(query)
+### Get the inner html of a specific html div
+def get_h3_title(contents):
+    for content in contents:
+        if content.name == 'h3':
+            return str(content.contents[0])
+    return ""
+
+def getMatchingLink(query : str, access_url : bool) -> str:
+    """ 
+        Parameters
+        --------------
+        query : str
+            a google search query for a given entity (e.g. "CITY OF GATESVILLE Texas")
+        
+        access_url : bool
+            a flag indicating whether we should try to access the url, and check the status code
+            and possibly the contents of the page or if we should just rely on the 
+            url itself and the title displayed in the google search results
+        
+        Returns a string representing the link of the correct matching link
+    """
+    if query in overriden_entity_map:
+        link = overriden_entity_map[query]
+        logger.info("Overriden entity. Correct url is: " + str(link))
+        return link
+
+    results = getGoogleSearchResults(query)
     matchingLink = ""
-    # logger.info(" --- " + str(query) + " ---")
-    # for link in links:
-    #     print(link)
-    # print("   ")
-    for link in links:
-        if is_valid_link1(link, query):
-            status = url_checker.getStatusCode(link)
-            logger.info(link + " --- " + str(status))
-            if is_valid_status(status):
-                matchingLink = link
+    for result in results:
+        logger.info("Candidate Result: " + str(result))
+        url_checker.getStatusCode(result.link)
+        if is_valid_link1(result, query):
+            if not access_url:
+                matchingLink = result.link
                 break
-        else:
-            logger.info(link + "--- invalid")
-    if matchingLink == '':
-        print("--------")
-        for link in links:
-            if is_valid_link2(link):
-                status = url_checker.getStatusCode(link)
-                logger.info("2nd pass: " + link + " --- " + str(status))
+            else:
+                status = url_checker.getStatusCode(result.link)
+                logger.info(str(result) + " --- " + str(status))
                 if is_valid_status(status):
-                    matchingLink = link
+                    matchingLink = result.link
                     break
+        # else:
+        #     logger.info(str(result) + "--- invalid")
+    if matchingLink == '':
+        for result in results:
+            if is_valid_link2(result.link):
+                if not access_url:
+                    matchingLink = result.link
+                    break
+                else:
+                    status = url_checker.getStatusCode(result.link)
+                    logger.info("2nd pass: " + result.link + " --- " + str(status))
+                    if is_valid_status(status):
+                        matchingLink = result.link
+                        break
+    logger.info("Chosen url: " + str(matchingLink))
     logger.info("   ")
     return matchingLink
 
-
 def is_valid_status(status):
     return status == 200 or status == 406 or status == 403
+    
+def expand_abbreviation(word):
+    w = word.lower()
+    if w in abbrev:
+        return abbrev[w]
+    return w
 
+def is_isd(queryWords : list) -> bool:
+    ind = False
+    sch = False
+    isd_abbrev = False
+    for word in queryWords:
+        if word == 'independent':
+            ind = True
+        elif word == 'school':
+            sch = True
+        elif word == 'isd':
+            return True
+    return ind and sch
 
-invalid_urls = ['wikipedia', 'facebook',
-                'books.google', 'city-data', 'mapquest', 'manta', 'yellowpages']
+def contains_isd_words(title):
+    for title_word in title.split(" "):
+        for isd_word in isd_words:
+            if isd_word in title_word.lower():
+                return True
+    return False
 
-valid_suffixes = ['home', 'index', 'main', 'en.html']
+def is_valid_link1(result : LinkResult, query : str) -> bool:
+    """
+        Parameters
+        --------------
+        result : LinkResult
+           a link result object that contains the page title and the url
+        
+        query : str
+           the google search query used to retrieve this result
+        
+        Returns true if the result is a valid result for the given search query.
+        First pass of algorithm.
+    """
+    link = result.link
+    title = result.title
 
-valid_entities = ['county', 'town', 'city']
-
-
-def is_valid_link1(link, query):
     slashes = num_slashes(link)
     words = query.split(" ")
+    new_words = []
+    for word in words:
+        new_words.append(expand_abbreviation(word.lower()))
+    
+    words = new_words
+    
     if len(words) >= 3:
         entityType = words[0].lower()
         if entityType in valid_entities:
-            entityName = words[2].lower()
-            if entityName not in link.lower():
+            # Check if city, town, county is in text
+            entityName = expand_abbreviation(words[2].lower())
+            if entityName not in title.lower():
                 return False
+            if len(words) >= 5:
+                entityName2 = words[3].lower()
+                if entityName2 not in title.lower():
+                    return False
+        else:
+            # Special district
+            nums = "123456789"
+            if words[-2] in nums:
+                number = words[-2].lower()
+                if number not in title.lower():
+                    return False
+            x, y = words[0].lower(), words[1].lower()
+            if x not in title.lower() and x not in link.lower():
+                return False
+    
+    # Check if a valid school district by consulting the title of the page
+    if is_isd(words):
+        if not contains_isd_words(title):
+            return False
 
     if slashes >= 4:
         return False
     if slashes == 3:
-        suffix = getPage(link)
+        # The page is one level deep; check the list of hardcoded valid pages
+        suffix = getPath(link)
         for valid_suffix in valid_suffixes:
             if valid_suffix in suffix:
                 return True
@@ -165,42 +255,41 @@ def is_valid_link1(link, query):
     return True
 
 
-valid_2_urls = ['tsswcb.texas.gov']
-
-
 def is_valid_link2(link):
     slashes = num_slashes(link)
     for valid_url in valid_2_urls:
         if valid_url in link:
             return True
     return False
-    # if '.gov' in link:
-    #     return True
-    # return False
 
-
-def num_slashes(link):
+def num_slashes(url):
+    """ Count the number of slashes in a url, ignoring the last character """
     count = 0
-    for letter in link[:-1]:
+    for letter in url[:-1]:
         if letter == '/':
             count += 1
     return count
 
 
-def getPage(link):
+def getPath(url):
+    """
+        Returns the path portion of a url. I.e. everything that comes after the hostname.
+        Done this by counting the number of slashes
+    """
     count = 0
-    for i, letter in enumerate(link[:-1]):
+    for i, letter in enumerate(url[:-1]):
         if letter == '/':
             count += 1
         elif count >= 3:
-            return link[i:]
+            return url[i:]
     return ''
 
 
 def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             suffix="",
             header_exists=True, debug=False,
-            startRow=1, parallel=True, match_correct=False, endRow=1):
+            startRow=1, parallel=True, match_correct=False, endRow=1,
+            access_url=True):
     xlsx_file = Path(excel_filename)
     wb_obj = openpyxl.load_workbook(xlsx_file)
     wsheet = wb_obj[tab_name]
@@ -242,15 +331,15 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
                     continue
 
                 nameCell = column + str(rowNumber)
-                # print(rowNumber)
                 if wsheet[nameCell].value is None:
                     continue
                 entityName = wsheet[nameCell].value + " " + suffix
 
                 correct_url = book['Sheet1']['C' + str(rowNumber)].value
                 if correct_url is not None:
+                    logger.info("   ")
                     logger.info(entityName + ": \"" + str(correct_url) + "\"")
-                    res = fn(entityName)
+                    res = fn(entityName, access_url)
                     book['Sheet1']['A' + str(rowNumber)].value = entityName
                     book['Sheet1']['B' + str(rowNumber)].value = res
                     if res == correct_url or (res == '' and correct_url == 'None'):
@@ -266,8 +355,6 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
                     saved = False
                 if count % 10 == 0 and not saved:
                     elapsed = time.time() - start
-                    # logger.info("%d (%.2f)" %
-                    #             (rowNumber, num_correct / (num_filled + 0.01)))
                     logger.info("%d correct: %d, filled: %d, total: %d",
                                 rowNumber, num_correct, num_filled, count)
                     logger.info("accuracy: %.3f " %
@@ -286,8 +373,10 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
                     continue
                 nameCell = column + str(rowNumber)
                 entityName = wsheet[nameCell].value + " " + suffix
+                logger.info("   ")
+                logger.info(entityName)
 
-                res = fn(entityName)
+                res = fn(entityName, access_url)
                 book['Sheet1']['A' + str(rowNumber)].value = entityName
                 book['Sheet1']['B' + str(rowNumber)].value = res
                 if rowNumber % 10 == 0:
@@ -308,7 +397,9 @@ def getEntities(start_row, wsheet, increment, column, suffix):
     return entities
 
 
+### Main method
+
 iterate('Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='texas_websites_01_05_22_MJ.xlsx', fn=getMatchingLink,
+        'D', output_file='texas_websites_01_05_22_MJ_2.xlsx', fn=getMatchingLink,
         suffix="Texas",
-        debug=True, parallel=False, match_correct=False, startRow=1, endRow=500)
+        debug=True, parallel=False, match_correct=False, startRow=350, endRow=6000, access_url=False)

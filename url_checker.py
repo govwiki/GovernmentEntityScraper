@@ -33,10 +33,12 @@ def getStatusCode(url):
     try:
         r = requests.get(url, timeout=10)
         success = r.status_code
+        # logger.info("keys: " + str(r.text))
         # if success != 200:
         #     logger.info(str(url) + " --- " + str(r.text))
 
     except Exception as e:
+        logger.info("get url: " + str(url) + "  " + str(e))
         return -1
     return success
 

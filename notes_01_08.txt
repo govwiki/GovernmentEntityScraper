@@ -1,0 +1,24 @@
+5329 correct: 166, filled: 176, total: 216
+5329 correct: 166, filled: 176, total: 216
+
+
+5329 correct: 184, filled: 191, total: 216
+5329 correct: 184, filled: 191, total: 216
+
+5329 correct: 186, filled: 192, total: 216
+
+Don't check status page of url (this removes the timeout problem)
+
+5329 correct: 201, filled: 205, total: 216
+5329 correct: 201, filled: 205, total: 216
+
+--- 
+
+https://www.bexar.org/1176/Emergency-Services-District-3/
+
+hardcode entries in an excel file
+~ one file for overridden entries
+~ one file for websites ignored
+
+~ check the internet archives to see if browser time out is due to temporary outage
+
