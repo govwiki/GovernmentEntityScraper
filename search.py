@@ -94,6 +94,13 @@ def getGoogleSearchResults(query):
         return []
 
 class LinkResult:
+    """
+        A data type that contains two elements
+        title : str
+            The page title of the web page. This is what shows up as the link text in a Google search result.
+        link : str
+            The full url of the web page
+    """
     def __init__(self, title, href):
         self.title = title
         self.link = href
@@ -101,8 +108,10 @@ class LinkResult:
     def __str__(self):
         return self.title + " : " + self.link
 
-### Get the inner html of a specific html div
-def get_h3_title(contents):
+def get_h3_title(contents : list):
+    """
+        A helper method used to help parse the html of a google search result.
+    """
     for content in contents:
         if content.name == 'h3':
             return str(content.contents[0])
@@ -142,8 +151,6 @@ def getMatchingLink(query : str, access_url : bool) -> str:
                 if is_valid_status(status):
                     matchingLink = result.link
                     break
-        # else:
-        #     logger.info(str(result) + "--- invalid")
     if matchingLink == '':
         for result in results:
             if is_valid_link2(result.link):
@@ -170,6 +177,9 @@ def expand_abbreviation(word):
     return w
 
 def is_isd(queryWords : list) -> bool:
+    """
+        Does the Google search query pertain to an ISD (Independent School District)
+    """
     ind = False
     sch = False
     isd_abbrev = False
@@ -182,7 +192,10 @@ def is_isd(queryWords : list) -> bool:
             return True
     return ind and sch
 
-def contains_isd_words(title):
+def contains_isd_words(title : str):
+    """
+        Does the page title of a web page contain keywords that indicate it is likely an ISD
+    """
     for title_word in title.split(" "):
         for isd_word in isd_words:
             if isd_word in title_word.lower():
@@ -255,10 +268,15 @@ def is_valid_link1(result : LinkResult, query : str) -> bool:
     return True
 
 
-def is_valid_link2(link):
-    slashes = num_slashes(link)
+def is_valid_link2(url):
+    """
+        2nd pass of the algorithm where we check if the url is valid.
+        basically, we allow all web pages (with arbitrary path depth) 
+        that originate from "valid_2_urls" list.
+    """
+    slashes = num_slashes(url)
     for valid_url in valid_2_urls:
-        if valid_url in link:
+        if valid_url in url:
             return True
     return False
 
@@ -302,6 +320,10 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
     increment = 10
     start = time.time()
     if parallel:
+        """ Parallel execution of requests. 
+            Although faster than non-parallel variant, we've experimentally found that this
+            triggers Google to block subsequent results due to high load.
+        """
         while rowNumber < startRow:
             rowNumber += 1
 
@@ -321,6 +343,9 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             rowNumber += increment
     else:
         if match_correct:
+            """ This flag is used to generate urls for entities that have a ground truth url 
+               (i.e. column C 'correct url' is populated with a url) 
+            """
             count = 0
             num_correct = 0
             num_filled = 0
@@ -367,6 +392,7 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
             book.save(output_file)
 
         else:
+            """ This code snippet is used to generate urls for all entities """
             for row in wsheet.iter_rows(max_row=wsheet.max_row):
                 rowNumber += 1
                 if rowNumber < startRow:
