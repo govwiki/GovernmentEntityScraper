@@ -9,7 +9,7 @@ import csv
 
 def get_valid_urls():
   ls = []
-  with open('valid_urls.csv', newline='') as csvfile:
+  with open('overrides/valid_urls.csv', newline='') as csvfile:
     url_reader = csv.reader(csvfile, delimiter=',', quotechar='|')
     header = True
     for row in url_reader:

@@ -3,7 +3,7 @@ import csv
 
 def get_overriden_entities():
   map = {}
-  with open('overriden_entities.csv', newline='') as csvfile:
+  with open('overrides/overriden_entities.csv', newline='') as csvfile:
     url_reader = csv.reader(csvfile, delimiter=',', quotechar='|')
     header = True
     for row in url_reader:

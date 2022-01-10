@@ -425,7 +425,7 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 
 ### Main method
 
-iterate('Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='texas_websites_01_10_22.xlsx', fn=getMatchingLink,
+iterate('data/Texas Local Governments.xlsx', 'Census of Govts',
+        'D', output_file='data/texas_websites_01_10_22.xlsx', fn=getMatchingLink,
         suffix="Texas",
         debug=True, parallel=False, match_correct=False, startRow=1, endRow=6000, access_url=False)
