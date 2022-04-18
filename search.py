@@ -9,8 +9,10 @@ import logging
 import datetime
 import sys
 import time
+import getopt
 
 import openpyxl
+from openpyxl import Workbook
 from pathlib import Path
 import concurrent.futures
 
@@ -316,7 +318,11 @@ def iterate(excel_filename, tab_name, column, output_file=None, fn=None,
         rowNumber = 2
     statusCodeMap = {}
     collection = []
-    book = openpyxl.load_workbook(output_file)
+    if(Path(output_file).exists()):
+        book = openpyxl.load_workbook(output_file)
+    else:
+        book = Workbook()
+        book.create_sheet()
     increment = 10
     start = time.time()
     if parallel:
@@ -424,8 +430,53 @@ def getEntities(start_row, wsheet, increment, column, suffix):
 
 
 ### Main method
+# iterate('data/Govt_Units_2017_Final.xlsx', 'General Purpose',
+#         'B', output_file='data/govt_units_18_04_22.xlsx', fn=getMatchingLink,
+#         suffix="",
+#         debug=True, parallel=False, match_correct=False, startRow=1, endRow=1000, access_url=False)
 
-iterate('data/Texas Local Governments.xlsx', 'Census of Govts',
-        'D', output_file='data/texas_websites_01_10_22.xlsx', fn=getMatchingLink,
-        suffix="Texas",
-        debug=True, parallel=False, match_correct=False, startRow=1, endRow=6000, access_url=False)
+def main(argv):
+    inputfile = None
+    outputfile = None
+    sheetname = None
+    columnname = None
+    try:
+        opts, args = getopt.getopt(argv, "hi:o:s:c:", ["ifile=", "ofile=", "sheetname=", "columnname="])
+    except getopt.GetoptError:
+        print
+        'search.py -i <inputfile> -o <outputfile> -s <sheetname> -c <columnname>'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print
+            'test.py -i <inputfile> -o <outputfile> -s <sheetname> -c <columnname>'
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            inputfile = arg
+        elif opt in ("-o", "--ofile"):
+            outputfile = arg
+        elif opt in ("-s", "--sheetname"):
+            sheetname = arg
+        elif opt in ("-c", "--columnname"):
+            columnname = arg
+    print
+    'Input file is "', inputfile
+    print
+    'Sheet name is "', sheetname
+    print
+    'Column name is "', columnname
+    print
+    'Output file is "', outputfile
+    iterate(inputfile, sheetname,
+            columnname, outputfile, fn=getMatchingLink,
+            suffix="",
+            debug=True, parallel=False, match_correct=False, startRow=1, endRow=1000, access_url=False)
+
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
+
+# iterate('data/Texas Local Governments.xlsx', 'Census of Govts',
+#         'D', output_file='data/texas_websites_01_10_22.xlsx', fn=getMatchingLink,
+#         suffix="Texas",
+#         debug=True, parallel=False, match_correct=False, startRow=1, endRow=6000, access_url=False)
